@@ -1,0 +1,17 @@
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# Кэш Python и скомпилированные файлы
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Кэш тестов и линтеров
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Локальные настройки (на будущее)
+.env

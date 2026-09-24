@@ -1,0 +1,76 @@
+name: API CI/CD
+
+# 1. Триггеры: когда запускать автоматизацию
+on:
+  push:
+    branches: [ "master" ]
+    tags: [ "v*.*.*" ]     # Сработает при создании тегов вроде v1.0.0, v2.1.3
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  # ==========================================
+  # ЭТАП СI: Тестирование и линтинг кода
+  # ==========================================
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Запускаем 3 параллельных сервера с разными версиями Python
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Скачиваем код репозитория
+        uses: actions/checkout@v4
+
+      - name: Устанавливаем Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' # Ускоряет повторные запуски, кэшируя библиотеки
+
+      - name: Устанавливаем зависимости проекта
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Проверка чистоты кода линтером (Ruff)
+        run: ruff check .
+
+      - name: Запуск автотестов (Pytest)
+        run: pytest
+
+  # ==========================================
+  # ЭТАП CD: Сборка и публикация в Docker Hub
+  # ==========================================
+  build-and-push:
+    # Запускать этот этап только если этап тестирования прошел успешно
+    needs: build-and-test
+    # Публиковать только в том случае, если это пуш Git-тега релиза
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Скачиваем код репозитория
+        uses: actions/checkout@v4
+
+      - name: Логин в Docker Hub
+        uses: docker/login-action@v3
+        with:
+          # Используем зашифрованные переменные из GitHub Secrets
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Извлекаем версию из тега
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Сборка и отправка Docker-образа
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Публикуем сразу два тега: актуальный номер версии и ярлык latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/bmi-api:latest
+            ${{ secrets.DOCKER_USERNAME }}/bmi-api:${{ env.VERSION }}

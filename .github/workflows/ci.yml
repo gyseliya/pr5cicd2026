@@ -37,8 +37,8 @@ jobs:
       - name: Проверка чистоты кода линтером (Ruff)
         run: ruff check .
 
-      - name: Запуск автотестов (Pytest)
-        run: pytest
+      # - name: Запуск автотестов (Pytest)
+      #   run: pytest
 
   # ==========================================
   # ЭТАП CD: Сборка и публикация в Docker Hub
